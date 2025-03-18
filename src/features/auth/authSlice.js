@@ -21,9 +21,30 @@ export const loginUser = createAsyncThunk(
   async (credentials, { rejectWithValue }) => {
     try {
       const response = await authService.loginUser(credentials);
+      
+      // MFA required - return partial auth info
+      if (response.requiresMfa) {
+        return { 
+          requiresMfa: true, 
+          userId: response.userId 
+        };
+      }
+      
       return response.user;
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || "Login failed");
+    }
+  }
+);
+
+export const verifyMfaLogin = createAsyncThunk(
+  "auth/verifyMfaLogin",
+  async ({ username, password, mfaToken }, { rejectWithValue }) => {
+    try {
+      const response = await authService.loginUser({ username, password, mfaToken });
+      return response.user;
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.message || "MFA verification failed");
     }
   }
 );
@@ -62,10 +83,14 @@ export const authSlice = createSlice({
     isAuthenticated: false,
     loading: false,
     error: null,
+    mfaRequired: false,
+    pendingMfaUserId: null,
+    rateLimitExceeded: false,
   },
   reducers: {
     clearError: (state) => {
       state.error = null;
+      state.rateLimitExceeded = false;
     },
     // For OAuth callback to set user directly
     oauthLoginSuccess: (state, action) => {
@@ -73,6 +98,18 @@ export const authSlice = createSlice({
       state.isAuthenticated = true;
       state.loading = false;
       state.error = null;
+      state.mfaRequired = false;
+      state.pendingMfaUserId = null;
+      state.rateLimitExceeded = false;
+    },
+    // For updating user profile directly
+    updateUserProfile: (state, action) => {
+      state.user = action.payload;
+    },
+    // For resetting the MFA state
+    resetMfaState: (state) => {
+      state.mfaRequired = false;
+      state.pendingMfaUserId = null;
     },
   },
   extraReducers: (builder) => {
@@ -81,6 +118,7 @@ export const authSlice = createSlice({
       .addCase(registerUser.pending, (state) => {
         state.loading = true;
         state.error = null;
+        state.rateLimitExceeded = false;
       })
       .addCase(registerUser.fulfilled, (state, action) => {
         state.loading = false;
@@ -88,22 +126,77 @@ export const authSlice = createSlice({
       .addCase(registerUser.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
+        
+        // Check for rate limiting errors
+        if (action.payload && action.payload.includes('Too many')) {
+          state.rateLimitExceeded = true;
+        }
       })
 
       // Login cases
       .addCase(loginUser.pending, (state) => {
         state.loading = true;
         state.error = null;
+        state.mfaRequired = false;
+        state.pendingMfaUserId = null;
+        state.rateLimitExceeded = false;
       })
       .addCase(loginUser.fulfilled, (state, action) => {
-        state.user = action.payload;
-        state.isAuthenticated = true;
+        // Check if MFA is required
+        if (action.payload && action.payload.requiresMfa) {
+          state.loading = false;
+          state.mfaRequired = true;
+          state.pendingMfaUserId = action.payload.userId;
+          state.isAuthenticated = false;
+          state.user = null;
+        } else {
+          state.user = action.payload;
+          state.isAuthenticated = true;
+          state.mfaRequired = false;
+          state.pendingMfaUserId = null;
+        }
         state.loading = false;
         state.error = null;
+        state.rateLimitExceeded = false;
       })
       .addCase(loginUser.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
+        
+        // Check for rate limiting errors
+        if (action.payload && action.payload.includes('Too many')) {
+          state.rateLimitExceeded = true;
+        }
+      })
+      
+      // MFA Verification for login
+      .addCase(verifyMfaLogin.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+        state.rateLimitExceeded = false;
+      })
+      .addCase(verifyMfaLogin.fulfilled, (state, action) => {
+        state.user = action.payload;
+        state.isAuthenticated = true;
+        state.loading = false;
+        state.error = null;
+        state.mfaRequired = false;
+        state.pendingMfaUserId = null;
+        state.rateLimitExceeded = false;
+      })
+      .addCase(verifyMfaLogin.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+        
+        // Keep MFA required state
+        if (state.mfaRequired) {
+          state.mfaRequired = true;
+        }
+        
+        // Check for rate limiting errors
+        if (action.payload && action.payload.includes('Too many')) {
+          state.rateLimitExceeded = true;
+        }
       })
 
       // Logout cases
@@ -115,12 +208,17 @@ export const authSlice = createSlice({
         state.isAuthenticated = false;
         state.loading = false;
         state.error = null;
+        state.mfaRequired = false;
+        state.pendingMfaUserId = null;
+        state.rateLimitExceeded = false;
       })
       .addCase(logoutUser.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
         state.user = null;
         state.isAuthenticated = false;
+        state.mfaRequired = false;
+        state.pendingMfaUserId = null;
       })
 
       // Get current user cases
@@ -133,16 +231,25 @@ export const authSlice = createSlice({
         state.isAuthenticated = true;
         state.loading = false;
         state.error = null;
+        state.mfaRequired = false;
+        state.pendingMfaUserId = null;
       })
       .addCase(getCurrentUser.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
         state.user = null;
         state.isAuthenticated = false;
+        state.mfaRequired = false;
+        state.pendingMfaUserId = null;
       });
   },
 });
 
-export const { clearError, oauthLoginSuccess } = authSlice.actions;
+export const { 
+  clearError, 
+  oauthLoginSuccess, 
+  updateUserProfile,
+  resetMfaState
+} = authSlice.actions;
 
 export default authSlice.reducer;

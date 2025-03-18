@@ -18,6 +18,12 @@ import CreateJob from './pages/CreateJob';
 import EditJob from './pages/EditJob';
 import JobDetailPage from './pages/JobDetailPage';
 
+// Authentication-related pages
+import VerifyEmail from './pages/VerifyEmail';
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
+import MfaSetup from './pages/MfaSetup';
+
 function App() {
   const dispatch = useDispatch();
   
@@ -38,6 +44,11 @@ function App() {
           <Route path="/register" element={<Register />} />
           <Route path="/auth/success" element={<OAuthCallback />} />
           
+          {/* Authentication-related public routes */}
+          <Route path="/verify-email" element={<VerifyEmail />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
+          
           {/* Job Routes - some public, some protected */}
           <Route path="/" element={<Jobs />} />
           <Route path="/jobs/:jobId" element={<JobDetailPage />} />
@@ -48,6 +59,7 @@ function App() {
             <Route path="/profile" element={<Profile />} />
             <Route path="/jobs/create" element={<CreateJob />} />
             <Route path="/jobs/edit/:jobId" element={<EditJob />} />
+            <Route path="/mfa/setup" element={<MfaSetup />} />
           </Route>
         </Routes>
       </main>

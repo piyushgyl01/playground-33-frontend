@@ -67,4 +67,42 @@ export const getGithubAuthUrl = () => {
   return `${API.defaults.baseURL}/auth/github`;
 };
 
+// Email verification functions
+export const verifyEmail = async (token) => {
+  const response = await API.get(`/auth/verify-email?token=${token}`);
+  return response.data;
+};
+
+export const resendVerificationEmail = async () => {
+  const response = await API.post("/auth/resend-verification");
+  return response.data;
+};
+
+// Password reset functions
+export const forgotPassword = async (email) => {
+  const response = await API.post("/auth/forgot-password", { email });
+  return response.data;
+};
+
+export const resetPassword = async ({ token, password }) => {
+  const response = await API.post("/auth/reset-password", { token, password });
+  return response.data;
+};
+
+// MFA functions
+export const setupMfa = async () => {
+  const response = await API.post("/auth/mfa/setup");
+  return response.data;
+};
+
+export const verifyMfa = async (token) => {
+  const response = await API.post("/auth/mfa/verify", { token });
+  return response.data;
+};
+
+export const disableMfa = async ({ password, mfaToken }) => {
+  const response = await API.post("/auth/mfa/disable", { password, mfaToken });
+  return response.data;
+};
+
 export default API;

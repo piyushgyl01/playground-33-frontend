@@ -1,8 +1,16 @@
 import { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { Link, useNavigate } from 'react-router-dom';
-import { registerUser, loginUser, clearError } from '../features/auth/authSlice';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { 
+  registerUser, 
+  loginUser, 
+  clearError, 
+  verifyMfaLogin,
+  resetMfaState
+} from '../features/auth/authSlice';
 import { getGoogleAuthUrl, getGithubAuthUrl } from '../services/authService';
+import MfaForm from './MfaForm';
+import PasswordStrengthMeter from './PasswordStrengthMeter';
 
 const AuthForm = ({ isLogin = true }) => {
   const [formData, setFormData] = useState({
@@ -13,10 +21,32 @@ const AuthForm = ({ isLogin = true }) => {
     confirmPassword: ''
   });
   const [formError, setFormError] = useState('');
+  const [passwordFeedback, setPasswordFeedback] = useState(null);
+  const [mfaCode, setMfaCode] = useState('');
   
+  const location = useLocation();
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const { loading, error, isAuthenticated } = useSelector(state => state.auth);
+  
+  const { 
+    loading, 
+    error, 
+    isAuthenticated, 
+    mfaRequired,
+    pendingMfaUserId,
+    rateLimitExceeded
+  } = useSelector(state => state.auth);
+
+  // Check for message passed via state (like from email verification)
+  const [successMessage, setSuccessMessage] = useState('');
+  
+  useEffect(() => {
+    if (location.state?.message) {
+      setSuccessMessage(location.state.message);
+      // Clean up URL state after reading
+      navigate(location.pathname, { replace: true });
+    }
+  }, [location, navigate]);
 
   // Clear errors when component unmounts or form type changes
   useEffect(() => {
@@ -31,11 +61,22 @@ const AuthForm = ({ isLogin = true }) => {
     if (isAuthenticated) {
       navigate('/dashboard');
     }
-  }, [isAuthenticated, navigate]);
+    
+    // Reset MFA state if navigating away
+    return () => {
+      if (mfaRequired) {
+        dispatch(resetMfaState());
+      }
+    };
+  }, [isAuthenticated, navigate, dispatch, mfaRequired]);
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.id]: e.target.value });
     setFormError('');
+  };
+
+  const handlePasswordFeedback = (feedback) => {
+    setPasswordFeedback(feedback);
   };
 
   const validateForm = () => {
@@ -56,8 +97,9 @@ const AuthForm = ({ isLogin = true }) => {
         return false;
       }
       
-      if (formData.password.length < 8) {
-        setFormError('Password must be at least 8 characters long');
+      // Use password strength feedback
+      if (passwordFeedback && !passwordFeedback.valid) {
+        setFormError(passwordFeedback.message);
         return false;
       }
     }
@@ -87,12 +129,31 @@ const AuthForm = ({ isLogin = true }) => {
           email: formData.email || undefined
         })).unwrap();
         
-        // If registration is successful, redirect to login
-        navigate('/login');
+        // If registration is successful, redirect to login with message
+        navigate('/login', {
+          state: { 
+            message: formData.email 
+              ? 'Registration successful! Please check your email to verify your account.'
+              : 'Registration successful! You can now log in.'
+          }
+        });
       }
     } catch (error) {
       // Error is handled by the reducer
       console.error('Authentication error:', error);
+    }
+  };
+
+  // Handle MFA verification
+  const handleMfaSubmit = async (code) => {
+    try {
+      await dispatch(verifyMfaLogin({
+        username: formData.username,
+        password: formData.password,
+        mfaToken: code
+      })).unwrap();
+    } catch (error) {
+      console.error('MFA verification error:', error);
     }
   };
 
@@ -104,12 +165,45 @@ const AuthForm = ({ isLogin = true }) => {
       window.location.href = getGithubAuthUrl();
     }
   };
+  
+  // Check if we are showing MFA form
+  if (isLogin && mfaRequired) {
+    return (
+      <div className="card shadow-sm border-0 p-4">
+        <MfaForm 
+          onSubmit={handleMfaSubmit}
+          loading={loading}
+        />
+        
+        {error && (
+          <div className="alert alert-danger mt-3">
+            {error}
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="card shadow-sm border-0 p-4">
       <h3 className="text-center mb-4">
         {isLogin ? 'Login' : 'Create Account'}
       </h3>
+      
+      {/* Success message (from registration, email verification, etc.) */}
+      {successMessage && (
+        <div className="alert alert-success mb-4">
+          {successMessage}
+        </div>
+      )}
+      
+      {/* Rate limiting warning */}
+      {rateLimitExceeded && (
+        <div className="alert alert-warning mb-4">
+          <i className="bi bi-exclamation-triangle-fill me-2"></i>
+          Too many login attempts. Please try again later or reset your password.
+        </div>
+      )}
       
       {(formError || error) && (
         <div className="alert alert-danger">
@@ -146,7 +240,9 @@ const AuthForm = ({ isLogin = true }) => {
         
         {!isLogin && (
           <div className="mb-3">
-            <label htmlFor="email" className="form-label">Email (optional)</label>
+            <label htmlFor="email" className="form-label">
+              Email {isLogin ? '' : '(recommended for account recovery)'}
+            </label>
             <input
               type="email"
               className="form-control"
@@ -154,6 +250,11 @@ const AuthForm = ({ isLogin = true }) => {
               value={formData.email}
               onChange={handleChange}
             />
+            {!isLogin && (
+              <div className="form-text">
+                Adding an email enables password recovery and allows you to enable two-factor authentication.
+              </div>
+            )}
           </div>
         )}
         
@@ -167,6 +268,19 @@ const AuthForm = ({ isLogin = true }) => {
             onChange={handleChange}
             required
           />
+          
+          {/* Password strength meter for registration */}
+          {!isLogin && (
+            <PasswordStrengthMeter 
+              password={formData.password} 
+              userInfo={{
+                username: formData.username,
+                email: formData.email,
+                name: formData.name
+              }}
+              onFeedback={handlePasswordFeedback}
+            />
+          )}
         </div>
         
         {!isLogin && (
@@ -202,6 +316,13 @@ const AuthForm = ({ isLogin = true }) => {
       </form>
       
       <div className="text-center mb-3">
+        {isLogin && (
+          <p className="mb-2">
+            <Link to="/forgot-password" className="text-decoration-none">
+              Forgot your password?
+            </Link>
+          </p>
+        )}
         <p>
           {isLogin ? "Don't have an account? " : "Already have an account? "}
           <Link to={isLogin ? "/register" : "/login"}>
