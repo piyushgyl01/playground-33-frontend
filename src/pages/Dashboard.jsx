@@ -1,4 +1,5 @@
 import { useSelector } from 'react-redux';
+import { Link } from 'react-router-dom';
 
 const Dashboard = () => {
   const { user } = useSelector(state => state.auth);
@@ -12,9 +13,8 @@ const Dashboard = () => {
             <h4 className="alert-heading">Welcome, {user?.name || user?.username}!</h4>
             <p>You have successfully logged in to the protected dashboard.</p>
           </div>
-          
           <div className="row row-cols-1 row-cols-md-3 g-4 mt-3">
-            <div className="col">
+            <div className="col-md-6">
               <div className="card h-100">
                 <div className="card-body">
                   <h5 className="card-title">Your Profile</h5>
@@ -23,21 +23,12 @@ const Dashboard = () => {
                 </div>
               </div>
             </div>
-            <div className="col">
+            <div className="col-md-6">
               <div className="card h-100">
                 <div className="card-body">
-                  <h5 className="card-title">Settings</h5>
-                  <p className="card-text">Configure your account settings</p>
-                  <a href="#" className="btn btn-primary">Go to Settings</a>
-                </div>
-              </div>
-            </div>
-            <div className="col">
-              <div className="card h-100">
-                <div className="card-body">
-                  <h5 className="card-title">Messages</h5>
-                  <p className="card-text">Check your messages and notifications</p>
-                  <a href="#" className="btn btn-primary">View Messages</a>
+                  <h5 className="card-title">Jobs</h5>
+                  <p className="card-text">View all jobs</p>
+                  <Link to="/" className="btn btn-primary">Go to Jobs</Link>
                 </div>
               </div>
             </div>

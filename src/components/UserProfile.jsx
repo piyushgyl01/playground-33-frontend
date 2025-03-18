@@ -1,18 +1,17 @@
-import { useState } from 'react';
-import { useSelector } from 'react-redux';
+import { useState } from "react";
+import { useSelector } from "react-redux";
 
 const UserProfile = () => {
-  const { user } = useSelector(state => state.auth);
-  const [isEditing, setIsEditing] = useState(false);
-  
+  const { user } = useSelector((state) => state.auth);
+
   return (
     <div className="card shadow-sm border-0 p-4">
       <div className="d-flex flex-column align-items-center text-center mb-4">
-        <h3 className="mb-0">{user?.name || 'User'}</h3>
+        <h3 className="mb-0">{user?.name || "User"}</h3>
         <p className="text-muted">@{user?.username}</p>
         {user?.email && <p className="small">{user.email}</p>}
       </div>
-      
+
       <div className="card-body">
         <h5 className="card-title">Account Information</h5>
         <ul className="list-group list-group-flush">
@@ -44,26 +43,6 @@ const UserProfile = () => {
           )}
         </ul>
       </div>
-      
-      {isEditing ? (
-        <div className="card-footer bg-transparent border-0 text-center">
-          <button 
-            className="btn btn-outline-secondary"
-            onClick={() => setIsEditing(false)}
-          >
-            Cancel
-          </button>
-        </div>
-      ) : (
-        <div className="card-footer bg-transparent border-0 text-center">
-          <button 
-            className="btn btn-primary"
-            onClick={() => setIsEditing(true)}
-          >
-            Edit Profile
-          </button>
-        </div>
-      )}
     </div>
   );
 };
