@@ -61,7 +61,7 @@ const JobForm = () => {
   // Redirect on successful save
   useEffect(() => {
     if (success) {
-      navigate("/jobs");
+      navigate("/");
     }
   }, [success, navigate]);
 
@@ -244,7 +244,7 @@ const JobForm = () => {
             <button
               type="button"
               className="btn btn-outline-secondary"
-              onClick={() => navigate("/jobs")}
+              onClick={() => navigate("/")}
               disabled={loading}
             >
               Cancel
