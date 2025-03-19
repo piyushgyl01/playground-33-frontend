@@ -56,9 +56,11 @@ const JobList = () => {
 
       <div className="d-flex justify-content-between mb-4">
         <h2>Job Listings</h2>
-        <Link to="/jobs/create" className="btn btn-primary pt-2">
-          Post a New Job
-        </Link>
+        {user && (
+          <Link to="/jobs/create" className="btn btn-primary pt-2">
+            Post a New Job
+          </Link>
+        )}
       </div>
 
       {jobs.length === 0 ? (
